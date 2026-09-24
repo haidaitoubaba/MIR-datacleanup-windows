@@ -9,7 +9,7 @@ Download [MIR-Cleanup-Windows-v1.2.1.zip](https://github.com/haidaitoubaba/MIR-d
 - Release ZIP: `MIR Cleanup Windows 1.2.1/MIR Cleanup/MIR Cleanup.exe` and its required `_internal` folder.
 - The executable uses the supplied MIR cleanup image as its Windows app icon.
 - `Source`: Windows source, dependency pins, regression tests and build specification.
-- `Verification`: test logs, screenshots and verification reports.
+- `Verification`: release checks, numerical parity summary, and packaging notes.
 - `build-windows.ps1`: repeatable Windows build using Python 3.12 x64.
 
 ## Rebuild
