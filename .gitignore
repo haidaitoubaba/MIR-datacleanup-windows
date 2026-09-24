@@ -1,0 +1,7 @@
+*.zip
+*.zip.sha256
+Portable/
+MIR Cleanup Windows 1.2.1/
+.DS_Store
+__pycache__/
+*.pyc
