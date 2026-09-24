@@ -1,0 +1,15 @@
+{
+  "release": "1.2.1 Windows build 1",
+  "target": "Windows 11 x64 Intel/AMD",
+  "portable_build": true,
+  "requested_properties": ["202_STC", "202_STN"],
+  "automated_regression_tests": 15,
+  "regression_tests_passed": true,
+  "packaged_workflow_passed": true,
+  "numerical_parity_passed": true,
+  "icon_source": "Source/assets/mir-cleanup-icon.png",
+  "icon_embedded_in_executable": true,
+  "icon_sizes": [16, 24, 32, 48, 64, 128, 256],
+  "icu_startup_fix_verified": true,
+  "clean_machine_test": "not performed; requires separate Windows 11 x64 computer"
+}
