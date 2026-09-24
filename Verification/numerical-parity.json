@@ -1,0 +1,9 @@
+{
+  "passed": true,
+  "properties": 2,
+  "max_absolute_prediction_or_residual_difference": 0.0,
+  "rtol": 1e-08,
+  "atol": 1e-10,
+  "baseline": ".build-windows\\mac-source-baseline-two-properties\\session avec espaces \u00e9",
+  "comparison": ".build-windows\\packaged-verification\\session avec espaces \u00e9"
+}
