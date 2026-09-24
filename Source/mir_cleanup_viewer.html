@@ -1,0 +1,32 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>MIR PCA Explorer</title>
+<style>body{font:15px system-ui,sans-serif;background:#f3f6f8;color:#183346;margin:0}header{background:#143b4d;color:white;padding:24px 32px}h1{margin:0 0 8px;font-size:26px}main{max-width:1500px;margin:auto;padding:20px}section{background:white;border:1px solid #d4dfe5;border-radius:10px;padding:16px;margin-bottom:16px}.controls{display:flex;gap:16px;flex-wrap:wrap;align-items:end}label{display:flex;flex-direction:column;gap:6px;font-weight:600}select,button{font:inherit;padding:9px;border:1px solid #a8bbc5;border-radius:5px;background:white;color:#183346}button{cursor:pointer;background:#17677b;color:white}#scatter{height:620px}#variance{height:270px}p{line-height:1.5;margin:8px 0}.note{color:#496574}#status{font-weight:600} @media(max-width:700px){main{padding:10px}header{padding:20px}#scatter{height:480px}}</style>
+<script>/*PLOTLY_BUNDLE*/</script></head><body><header><h1>MIR PCA Explorer</h1><div>Explore all computed components · review candidates before confirming exclusions</div></header><main>
+<section><div class="controls">
+<label>Property<select id="property"></select></label><label>X axis<select id="xpc"></select></label><label>Y axis<select id="ypc"></select></label>
+<label>Colour by<select id="colour"><option value="group">Treatment group</option><option value="value">Reference value</option><option value="status">Review / exclusion status</option></select></label>
+<label>Records<select id="subset"><option value="all">All records</option><option value="retained">Retained only</option><option value="excluded">Confirmed excluded only</option></select></label>
+<button id="reset">Reset view</button><button id="download">Download current PNG</button></div>
+<p id="status"></p><p id="basis" class="note"></p><p class="note">Hover for sample and filename details. Use the toolbar to zoom or pan; click legend entries to hide groups. Candidate diamonds remain included until confirmed. Confirmed exclusions use crosses. Similarity rankings use all retained PCs; nearby points are not automatically bad spectra.</p></section>
+<section><div id="scatter"></div></section><section><div id="variance"></div></section>
+<p class="note">SOP-inspired Python diagnostics, not an exact OPUS reproduction. Confirm exclusions in review.xlsx, then run apply. This viewer does not edit the workbook.</p></main>
+<script>
+const DATA=/*PCA_DATA*/{};
+const el=id=>document.getElementById(id);let revision=0;
+const escapeText=v=>String(v).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+Object.keys(DATA).forEach(p=>el('property').add(new Option(p,p)));
+function axisLabel(i,d){return `PC${i+1} (${(d.variance[i]*100).toFixed(2)}%)`;}
+function selectProperty(){const d=DATA[el('property').value];['xpc','ypc'].forEach(id=>{el(id).replaceChildren();d.variance.forEach((v,i)=>el(id).add(new Option(axisLabel(i,d),i)));});el('ypc').value=Math.min(1,d.variance.length-1);draw();}
+function draw(){const property=el('property').value,d=DATA[property],x=Number(el('xpc').value),y=Number(el('ypc').value),colour=el('colour').value,subset=el('subset').value;
+const rows=d.records.filter(r=>subset==='all'||(subset==='retained'?!r.excluded:r.excluded));
+const categories=colour==='value'?['Reference value']:[...new Set(rows.map(r=>r[colour]))].sort((a,b)=>String(a).localeCompare(String(b),undefined,{numeric:true}));
+const traces=categories.map(cat=>{const rs=colour==='value'?rows:rows.filter(r=>r[colour]===cat);return {type:'scatter',mode:'markers',name:escapeText(cat),x:rs.map(r=>r.scores[x]),y:rs.map(r=>r.scores[y]),
+ customdata:rs.map(r=>[r.sample,r.file,r.group,r.value,r.status,r.nearest,r.distance].map(escapeText)),
+ marker:{size:8,opacity:.8,symbol:rs.map(r=>r.excluded?'x':r.status.includes('candidate')?'diamond':'circle'),...(colour==='value'?{color:rs.map(r=>r.value),colorscale:'Viridis',showscale:true,colorbar:{title:{text:'Reference value'}},cmin:Math.min(...d.records.map(r=>r.value)),cmax:Math.max(...d.records.map(r=>r.value))}:{})},
+ hovertemplate:'Sample: %{customdata[0]}<br>File: %{customdata[1]}<br>Treatment: %{customdata[2]}<br>Reference: %{customdata[3]}<br>Status: %{customdata[4]}<br>Nearest: %{customdata[5]}<br>Distance: %{customdata[6]}<br>'+axisLabel(x,d)+': %{x:.6g}<br>'+axisLabel(y,d)+': %{y:.6g}<extra></extra>'};});
+window.lastPlotPromise=Plotly.react('scatter',traces,{title:{text:escapeText(property)+' — PCA scores'},xaxis:{title:{text:axisLabel(x,d)},autorange:true,zeroline:true},yaxis:{title:{text:axisLabel(y,d)},autorange:true,zeroline:true},legend:{orientation:'h'},margin:{t:55,b:100,l:85,r:60},hovermode:'closest',uirevision:++revision},{responsive:true,displaylogo:false,toImageButtonOptions:{format:'png',filename:property+'_PCA',scale:2}});
+Plotly.react('variance',[{type:'bar',x:d.variance.map((_,i)=>'PC'+(i+1)),y:d.variance.map(v=>100*v),marker:{color:'#17677b'},hovertemplate:'%{x}: %{y:.2f}%<extra></extra>'}],{title:{text:'Explained variance'},yaxis:{title:{text:'Variance (%)'}},margin:{t:45,b:40,l:65,r:20}},{responsive:true,displaylogo:false});
+el('status').textContent=`${rows.length} visible spectra · ${new Set(rows.map(r=>r.sample)).size} samples · ${d.variance.length} computed PCs · ${d.records.filter(r=>r.excluded).length} confirmed exclusions`;
+el('basis').textContent=d.basis+'. All/retained views share the same PCA basis.'+(d.variance.length<2?' Only one valid component is available.':'');}
+el('property').onchange=selectProperty;['xpc','ypc','colour','subset'].forEach(id=>el(id).onchange=draw);el('reset').onclick=draw;
+el('download').onclick=()=>Plotly.downloadImage('scatter',{format:'png',filename:el('property').value+'_PC'+(+el('xpc').value+1)+'_PC'+(+el('ypc').value+1),scale:2});selectProperty();
+</script></body></html>

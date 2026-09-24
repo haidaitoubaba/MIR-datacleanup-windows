@@ -1,0 +1,14 @@
+# Release build versions; Python 3.12, Windows 11 x64 (same direct pins as Mac 1.2.1)
+numpy==2.1.0
+pandas==2.2.3
+scipy==1.17.1
+scikit-learn==1.9.0
+matplotlib==3.9.2
+PySide6==6.11.0
+plotly==7.0.0
+openpyxl==3.1.5
+joblib==1.5.3
+threadpoolctl==3.6.0
+brukeropusreader==1.3.4
+pyinstaller==6.22.3
+lxml==5.3.0
