@@ -1,15 +1,20 @@
 {
-  "release": "1.2.1 Windows build 1",
+  "release": "1.4.0",
   "target": "Windows 11 x64 Intel/AMD",
+  "mac_source_tag": "v1.4.0",
+  "mac_source_commit": "a7078659520b518d151fbece7d33d7a1070ed15a",
   "portable_build": true,
-  "requested_properties": ["202_STC", "202_STN"],
-  "automated_regression_tests": 15,
+  "requested_properties": [
+    "202_STC",
+    "202_STN"
+  ],
+  "automated_regression_tests": 23,
   "regression_tests_passed": true,
-  "packaged_workflow_passed": true,
+  "packaged_manual_workflow_passed": true,
+  "packaged_automatic_cleanup_passed": true,
   "numerical_parity_passed": true,
-  "icon_source": "Source/assets/mir-cleanup-icon.png",
+  "existing_session_launch_passed": true,
   "icon_embedded_in_executable": true,
-  "icon_sizes": [16, 24, 32, 48, 64, 128, 256],
-  "icu_startup_fix_verified": true,
-  "clean_machine_test": "not performed; requires separate Windows 11 x64 computer"
+  "executable_sha256": "78b47622e181dbe44711253a6c7469c087763b805d76493b457ad19af0571ea9",
+  "clean_machine_test": "not performed"
 }

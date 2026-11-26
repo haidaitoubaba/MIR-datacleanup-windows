@@ -1,12 +1,12 @@
-# MIR Cleanup — Windows 11 x64
+# MIR Cleanup 1.4.0 for Windows 11 x64
 
-Portable Windows build of the supplied Mac 1.2.1 source. See WINDOWS_APP_GUIDE.md for use.
+MIR Cleanup supports review and cleanup of mid-infrared spectra and reference data before modelling. The Windows port uses the [Mac v1.4.0 source](https://github.com/haidaitoubaba/MIR-datacleanup-mac/tree/v1.4.0). This version adds the redesigned review workbench, Light, Night and System appearance modes, and automatic candidate cleanup in a separate session copy.
 
-Download [MIR-Cleanup-Windows-v1.2.1.zip](https://github.com/haidaitoubaba/MIR-datacleanup-windows/releases/tag/v1.2.1) from the release Assets. Extract the whole ZIP before opening `MIR Cleanup.exe`; keep `_internal` beside it.
+Download the Windows ZIP from [Windows Releases](https://github.com/haidaitoubaba/MIR-datacleanup-windows/releases). Extract the whole ZIP, open the `MIR Cleanup` folder, and run `MIR Cleanup.exe`. Keep `_internal` beside the executable. See [the Windows app guide](WINDOWS_APP_GUIDE.md) for the workflow.
 
 ## Package layout
 
-- Release ZIP: `MIR Cleanup Windows 1.2.1/MIR Cleanup/MIR Cleanup.exe` and its required `_internal` folder.
+- Release ZIP `MIR-Cleanup-Windows-v1.4.0.zip` contains `MIR Cleanup/MIR Cleanup.exe` and its required `_internal` folder.
 - The executable uses the supplied MIR cleanup image as its Windows app icon.
 - `Source`: Windows source, dependency pins, regression tests and build specification.
 - `Verification`: release checks, numerical parity summary, and packaging notes.
@@ -16,18 +16,20 @@ Download [MIR-Cleanup-Windows-v1.2.1.zip](https://github.com/haidaitoubaba/MIR-d
 
 Run `./build-windows.ps1` in PowerShell with Python 3.12 x64 installed and available through `py`. Alternatively supply `-Python 'C:\path\to\python.exe'`. The script creates its own environment, installs the full Windows dependency lock, runs tests and builds the portable folder. It stops if any step fails.
 
-The build retains every direct dependency version from the Mac release. Scientific algorithms and session schema are unchanged. Windows-specific changes include UTF-8 text handling, Windows executable metadata, portable packaging, a neutral file-access message, and an opt-in packaged verification command. The Mac directory is not modified.
+The build uses the Windows dependency lock and writes the app to `Portable/MIR Cleanup`. The regression test log is saved at `Build/regression-tests.log`.
 
 ## Verify a packaged build
 
 From PowerShell, use absolute paths and a **new** output directory:
 
 ```powershell
-& '.\MIR Cleanup Windows 1.2.1\MIR Cleanup\MIR Cleanup.exe' --verify-windows --data 'C:\path\to\test-data' --verification-output 'C:\path\to\new-verification-output'
+& '.\Portable\MIR Cleanup\MIR Cleanup.exe' --verify-windows --data 'C:\path\to\test-data' --verification-output "$PWD\Build\verification"
 ```
 
-The command tests `202_STC` and `202_STN` by default, as requested for this Windows release. Use `--properties` followed by exact sheet names to choose another set, or `--properties all` for every sheet. Invalid selected sheets are recorded with their reasons. Progress is written to `verification.json`; a successful run ends with `"passed": true`. Test exclusions solely validate the workflow; do not use the resulting cleaned workbook as an approved scientific cleanup result. Inputs are hashed before and after to verify they are unchanged.
+The command tests manual and automatic cleanup on `202_STC` and `202_STN` by default. Use `--properties` followed by exact sheet names or `--properties all` to check a different set. `verification.json` records invalid sheets, progress, the executable checksum and the final result. Inputs are hashed before and after the run. The generated exports are test data.
+
+To reproduce a source baseline, run `Build/venv/Scripts/python.exe Source/mir_cleanup_app.py` with the same verification flags and a different output directory. Use `Source/compare_verification.py` with the source baseline session, the packaged manual session, and `Verification/numerical-parity.json` as the output. Pass `--packaged-report Build/verification/verification.json` to record the executable checksum with the comparison. Run `Build/venv/Scripts/python.exe package-windows.py` to create the release ZIP and its checksum. Packaging checks that the validation and parity reports match the executable being distributed.
 
 ## Clean-machine acceptance
 
-Copy the ZIP and separate test data to a Windows 11 x64 machine without Python. Extract the entire ZIP. Start the executable, create a session, complete PCA and A/B review, export, close, and reopen the saved session. Check file dialogs, offline viewer, workbook opening, and display scaling. Run the packaged verification command above and retain its JSON report. This remains a separate acceptance check until performed on such a machine; a restricted environment on the build computer is not equivalent.
+Copy the ZIP and test data to a Windows 11 x64 machine without Python. Extract the entire ZIP. Launch the app, complete a session through PCA, A/B review and export, then reopen the saved session. Check file dialogs, the offline viewer, workbook opening, appearance and display scaling. Run packaged verification from the extracted `MIR Cleanup` folder and retain the JSON report.

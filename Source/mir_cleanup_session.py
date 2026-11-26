@@ -108,6 +108,9 @@ class Session:
             if path.parent.resolve() != folder.resolve() or core.fingerprint(path) != p['matrix_sha256']:
                 raise ValueError('Saved session spectra failed verification.')
         session = cls(folder, state)
+        if state.get('_auto_checkpoint'):
+            import mir_cleanup_auto
+            mir_cleanup_auto.recover(session)
         changed = False
         for p in state['properties'].values():
             if 'B' in p['diagnostics'] and p['diagnostics']['B'].get('selection_source') != 'A':

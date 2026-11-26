@@ -37,7 +37,16 @@ if __name__ == '__main__':
     parser.add_argument('left', type=Path)
     parser.add_argument('right', type=Path)
     parser.add_argument('output', type=Path)
+    parser.add_argument('--packaged-report', type=Path)
     args = parser.parse_args()
     result = compare(args.left, args.right)
-    args.output.write_text(json.dumps(result, indent=2), encoding='utf-8')
+    if args.packaged_report:
+        report = json.loads(args.packaged_report.read_text(encoding='utf-8'))
+        if not (report['passed'] and report['frozen'] and report.get('executable_sha256') and
+                Path(report['session_folder']).resolve() == args.right.resolve()):
+            parser.error('The packaged report must describe the verified comparison session.')
+        result['windows_executable_sha256'] = report['executable_sha256']
+        result['baseline'] = args.left.parent.name
+        result['comparison'] = args.right.parent.name
+    args.output.write_text(json.dumps(result, indent=2) + '\n', encoding='utf-8')
     print(json.dumps(result, indent=2))

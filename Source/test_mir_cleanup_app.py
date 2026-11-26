@@ -280,4 +280,158 @@ class StagedTests(unittest.TestCase):
             w.checkpoint();s.decide('P','A',[w.visible[0]['File Name']],'concentration','sample');w.undo();self.assertFalse(s.excluded('P'))
             w.figure.savefig(Path(temp)/'ui.png');w.close();app.processEvents()
 
+    def test_workbench_manual_review_and_export_navigation(self):
+        import time
+        from unittest.mock import patch
+        from mir_cleanup_app import Window, W
+
+        app = W.QApplication.instance() or W.QApplication([])
+        with tempfile.TemporaryDirectory() as temp:
+            session = fixture(Path(temp) / 'session')
+            first_replicates = {row['Sample']: row['File Name'] for row in session.state['properties']['P']['pca']['rows']}
+            session.decide('P', 'PCA', list(first_replicates.values()), 'spectral_quality', 'spectrum')
+            window = Window()
+            errors = []
+            window.error = errors.append
+            self.addCleanup(window.deleteLater)
+            window.resize(1280, 720)
+            window.bind(session)
+            window.show()
+            app.processEvents()
+
+            def wait_for_worker():
+                deadline = time.monotonic() + 40
+                while window.worker is not None and time.monotonic() < deadline:
+                    app.processEvents()
+                    time.sleep(.01)
+                self.assertIsNone(window.worker)
+                self.assertFalse(errors, errors)
+
+            def button(page, text):
+                return next(b for b in page.findChildren(W.QPushButton) if b.text() == text and b.isVisible())
+
+            self.assertFalse(window.stage_buttons['B'].isEnabled())
+            self.assertTrue(window.calc.isVisible())
+            self.assertFalse(window.finish.isVisible())
+            window.show_export_overview()
+            wait_for_worker()
+            self.assertIs(window.pages.currentWidget(), window.export_page)
+            self.assertFalse(button(window.export_page, 'Export cleaned dataset').isEnabled())
+            button(window.export_page, 'Open selected property').click()
+            self.assertIs(window.pages.currentWidget(), window.review)
+            self.assertEqual(window.stage.currentText(), 'PCA')
+
+            window.calc.click()
+            wait_for_worker()
+            window.finish.click()
+            self.assertEqual(window.stage.currentText(), 'A')
+            window.calc.click()
+            wait_for_worker()
+            from matplotlib.backend_bases import MouseEvent
+            window.canvas.draw()
+            point = window.ax.transData.transform(window.xy[0])
+            click = MouseEvent('button_press_event', window.canvas, *point, button=1)
+            window.canvas.callbacks.process('button_press_event', click)
+            self.assertIn(window.visible[0]['File Name'], window.selected)
+            self.assertEqual(window.impact_label.text(), '1 sample · 2 spectra')
+            window.tabs.setCurrentWidget(window.full)
+            self.assertFalse(window.exclude_button.isVisible())
+            window.tabs.setCurrentIndex(0)
+            with patch.object(W.QMessageBox, 'question', return_value=W.QMessageBox.Yes):
+                window.exclude_button.click()
+            self.assertEqual(len(session.excluded('P', 'A')), 2)
+
+            window.finish.click()
+            self.assertEqual(window.stage.currentText(), 'B')
+            window.calc.click()
+            wait_for_worker()
+            window.finish.click()
+            window.next_button.click()
+            wait_for_worker()
+            export = button(window.export_page, 'Export cleaned dataset')
+            self.assertTrue(export.isEnabled())
+            with patch.object(W.QMessageBox, 'question', return_value=W.QMessageBox.Yes), \
+                 patch.object(W.QFileDialog, 'getExistingDirectory', return_value=temp):
+                export.click()
+                wait_for_worker()
+            self.assertIs(window.pages.currentWidget(), window.result_page)
+            destination = Path(session.state['last_export'])
+            self.assertTrue((destination / 'reference_cleaned.xlsx').is_file())
+            self.assertEqual(len(pd.read_excel(destination / 'reference_cleaned.xlsx', sheet_name='P')), 30)
+            self.assertEqual(window.size().width(), 1280)
+
+    def test_appearance_switch_preserves_session_view_and_export(self):
+        from matplotlib.colors import to_rgba
+        from mir_cleanup_app import APPEARANCE_KEY, PLOT_THEMES, QtCore, Window, W
+
+        app = W.QApplication.instance() or W.QApplication([])
+        previous_style, previous_palette = app.styleSheet(), app.palette()
+        self.addCleanup(app.setStyleSheet, previous_style)
+        self.addCleanup(app.setPalette, previous_palette)
+        with tempfile.TemporaryDirectory() as temp:
+            folder = Path(temp)
+            settings_file = str(folder / 'settings.ini')
+            settings = QtCore.QSettings(settings_file, QtCore.QSettings.Format.IniFormat)
+            window = Window(settings)
+            self.addCleanup(window.deleteLater)
+            window.resize(1280, 720)
+            window.show()
+            app.processEvents()
+            self.assertTrue(window.appearance_actions['system'].isChecked())
+            session = fixture(folder / 'session')
+            window.bind(session)
+            app.processEvents()
+            window.set_filter('Sample', 'S0')
+            window.colour.setCurrentText('Reference value')
+            window.select_mode.setCurrentIndex(2)
+            window.toggle_points(np.arange(len(window.visible)) == 0)
+            window.ax.set_xlim(-100, 100)
+            window.ax.set_ylim(-60, 60)
+            window.details_button.click()
+            window.comment.setText('Keep this unsaved comment')
+            original_selection = set(window.selected)
+            original_state = copy.deepcopy(session.state)
+            original_limits = (window.ax.get_xlim(), window.ax.get_ylim())
+            original_artist = window.artist
+            original_colorbar = window.colorbar
+            original_selector = window.lasso
+
+            window.appearance_actions['light'].trigger()
+            window.figure.savefig(folder / 'light.png', dpi=80)
+            window.appearance_actions['night'].trigger()
+            self.assertTrue(window.appearance_actions['night'].isChecked())
+            self.assertEqual(window.effective_appearance, 'night')
+            window.system_appearance_changed(QtCore.Qt.ColorScheme.Light)
+            self.assertEqual(window.effective_appearance, 'night')
+            self.assertEqual(window.ax.get_facecolor(), to_rgba(PLOT_THEMES['night']['background']))
+            self.assertIs(window.artist, original_artist)
+            self.assertIs(window.colorbar, original_colorbar)
+            self.assertIs(window.lasso, original_selector)
+            self.assertEqual(window.selected, original_selection)
+            self.assertEqual(window.filters, {'Sample': 'S0'})
+            self.assertEqual((window.ax.get_xlim(), window.ax.get_ylim()), original_limits)
+            self.assertEqual(window.stage.currentText(), 'PCA')
+            self.assertTrue(window.details_button.isChecked())
+            self.assertEqual(window.comment.text(), 'Keep this unsaved comment')
+            self.assertEqual(session.state, original_state)
+            window.figure.savefig(folder / 'night.png', dpi=80)
+            self.assertEqual((folder / 'light.png').read_bytes(), (folder / 'night.png').read_bytes())
+            self.assertEqual(window.ax.get_facecolor(), to_rgba(PLOT_THEMES['night']['background']))
+
+            settings.sync()
+            reopened = Window(QtCore.QSettings(settings_file, QtCore.QSettings.Format.IniFormat))
+            self.addCleanup(reopened.deleteLater)
+            self.assertEqual(reopened.appearance, 'night')
+            reopened.close()
+            window.appearance_actions['system'].trigger()
+            window.system_appearance_changed(QtCore.Qt.ColorScheme.Dark)
+            self.assertEqual(window.effective_appearance, 'night')
+            window.system_appearance_changed(QtCore.Qt.ColorScheme.Light)
+            self.assertEqual(window.effective_appearance, 'light')
+            self.assertEqual(settings.value(APPEARANCE_KEY), 'system')
+            self.assertTrue(window.appearance_actions['system'].isChecked())
+            window.close()
+            app.processEvents()
+
+
 if __name__=='__main__':unittest.main()

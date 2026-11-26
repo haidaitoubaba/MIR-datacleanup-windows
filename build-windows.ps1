@@ -18,9 +18,13 @@ if (-not $SkipInstall) {
 & $venvPython -m pip check
 if ($LASTEXITCODE -ne 0) { throw 'Dependency check failed.' }
 $env:QT_QPA_PLATFORM = 'offscreen'
-& $venvPython -m unittest discover -s (Join-Path $packageRoot 'Source') -p 'test_*.py' -v
-if ($LASTEXITCODE -ne 0) { throw 'Regression tests failed.' }
-Remove-Item Env:QT_QPA_PLATFORM
+try {
+    & $venvPython -m unittest discover -s (Join-Path $packageRoot 'Source') -p 'test_*.py' -v 2>&1 |
+        Tee-Object -FilePath (Join-Path $buildRoot 'regression-tests.log')
+    if ($LASTEXITCODE -ne 0) { throw 'Regression tests failed.' }
+} finally {
+    Remove-Item Env:QT_QPA_PLATFORM
+}
 & $venvPython -m PyInstaller --noconfirm --distpath (Join-Path $packageRoot 'Portable') --workpath (Join-Path $buildRoot 'work') (Join-Path $packageRoot 'Source/MIR Cleanup Windows.spec')
 if ($LASTEXITCODE -ne 0) { throw 'Windows packaging failed.' }
 Write-Host 'Build complete. Run the packaged verification before distributing.'

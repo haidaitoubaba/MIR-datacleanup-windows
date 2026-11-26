@@ -24,6 +24,7 @@ def run(app, argv):
     output.mkdir(parents=True, exist_ok=False)
     report = {'passed': False, 'platform': platform.platform(),
               'python': sys.version, 'frozen': bool(getattr(sys, 'frozen', False)),
+              'version': app.applicationVersion(),
               'properties': {}, 'clean_machine_test': 'not performed'}
     started = time.monotonic()
     window = None
@@ -36,6 +37,8 @@ def run(app, argv):
         app.processEvents()
 
     try:
+        if report['frozen']:
+            report['executable_sha256'] = core.fingerprint(Path(sys.executable))
         source = args.data.resolve() / 'reference' / 'reference_value_ZL_trt.xlsx'
         spectra = args.data.resolve() / 'spectra' / 'Complete'
         inputs = [source] + sorted(p for p in spectra.rglob('*') if p.is_file())
@@ -71,6 +74,24 @@ def run(app, argv):
             raise ValueError('No valid property sheets to test')
         save(f'Input validation complete; preparing {len(props)} valid property sheets')
         session = engine.Session.create(source, spectra, output / 'session avec espaces é', props)
+        if report['frozen']:
+            import mir_cleanup_auto as auto
+            original_session_hash = core.fingerprint(session.folder / 'session.json')
+            automatic = auto.run(session, lambda index, total, prop, stage:
+                                 save(f'Automatic cleanup {index}/{total}: {prop} ({stage})'))
+            automatic = engine.Session.load(automatic.folder)
+            results = automatic.state['auto_cleanup']['results']
+            if [result['property'] for result in results] != props or any(
+                    result['status'] != 'completed' for result in results):
+                raise AssertionError(f'Unexpected automatic cleanup results: {results}')
+            if issues := auto.readiness(automatic):
+                raise AssertionError(f'Automatic cleanup is not ready for export: {issues}')
+            automatic_export = automatic.export(output / 'automatic-export')
+            engine.verify_export(source, automatic_export / 'reference_cleaned.xlsx',
+                                 {prop: automatic.excluded(prop) for prop in props})
+            if core.fingerprint(session.folder / 'session.json') != original_session_hash:
+                raise AssertionError('Automatic cleanup changed the original session')
+            report['automatic_cleanup'] = results
         from mir_cleanup_app import Window
         window = Window()
         window.bind(session)
@@ -111,7 +132,8 @@ def run(app, argv):
             window.stage.setCurrentText(stage)
             window.refresh()
             app.processEvents()
-            window.grab().save(str(output / f'app-{stage}.png'))
+            if not window.grab().save(str(output / f'app-{stage}.png')):
+                raise OSError(f'Could not save the {stage} workbench screenshot')
         save('Exporting and checking retained workbook values')
         destination = session.export(output / 'export')
         engine.verify_export(source, destination / 'reference_cleaned.xlsx',

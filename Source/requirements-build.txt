@@ -1,4 +1,4 @@
-# Release build versions; Python 3.12, Windows 11 x64 (same direct pins as Mac 1.2.1)
+# Release build versions for Python 3.12 on Windows 11 x64.
 numpy==2.1.0
 pandas==2.2.3
 scipy==1.17.1
